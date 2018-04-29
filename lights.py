@@ -63,29 +63,47 @@ async def button_loop(device: evdev.InputDevice) -> None:
     global _current_schedule_paused
     async for event in device.async_read_loop():
         if event.value == 1:
-            if _current_schedule_paused:
-                _current_schedule_paused = False
-                set_state(colour=get_colour_for_now())
-            else:
-                double_click_start_time = time.time()
-                while (time.time() - double_click_start_time) < 0.35:
+            double_click_start_time = time.time()
+            double_click = False
+            while (time.time() - double_click_start_time) < 0.35 \
+                    and not double_click:
+                event = device.read_one()
+                while event is not None:
+                    if event.value == 1:
+                        double_click = True
+                        break
                     event = device.read_one()
-                    while event is not None:
-                        if event.value == 1:
-                            _current_schedule_paused = True
-                            set_state(True, colour=get_colour_for_now())
-                            break
-                        event = device.read_one()
-                    asyncio.sleep(0.1)
-                if not _current_schedule_paused:
-                    set_state(not _current_on_state, get_colour_for_now())
+                asyncio.sleep(0.1)
+            if double_click:
+                if _current_schedule_paused:
+                    print('Double click, NOT pausing already paused schedule')
+                else:
+                    _current_schedule_paused = True
+                    colour = get_colour_for_now()
+                    print('Double click, pausing schedule, forcing on, ' +
+                          'setting colour to: ', colour)
+                    set_state(on=True, colour=colour)
+            else:  # Single click
+                if _current_schedule_paused:
+                    _current_schedule_paused = False
+                    colour = get_colour_for_now()
+                    print('Button press -> unpausing schedule with: ', colour)
+                    set_state(colour=colour)
+                else:
+                    _current_on_state = not _current_on_state
+                    colour = get_colour_for_now()
+                    print('Button press, on going from %s to %s, colour %s' % (
+                          not _current_on_state, _current_on_state, colour))
+                    set_state(on=_current_on_state, colour=colour)
 
 
 async def schedule_loop(device: evdev.InputDevice) -> None:
     global _current_on_state
     while True:
-        set_state(colour=get_colour_for_now())
-        await asyncio.sleep(60)
+        colour = get_colour_for_now()
+        print('Schedule loop setting colour to: ', colour)
+        set_state(colour=colour)
+        await asyncio.sleep(60 * 5)
 
 
 device = None
@@ -99,6 +117,7 @@ if device is None:
     raise 'No device found'
 print('Running with device: ', device.fn)
 get_on_state()
+print('Starting with on state: ', _current_on_state)
 asyncio.ensure_future(button_loop(device))
 asyncio.ensure_future(schedule_loop(device))
 loop = asyncio.get_event_loop()
