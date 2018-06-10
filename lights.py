@@ -97,7 +97,7 @@ async def button_loop(device: evdev.InputDevice) -> None:
                     set_state(on=_current_on_state, colour=colour)
 
 
-async def schedule_loop(device: evdev.InputDevice) -> None:
+async def schedule_loop() -> None:
     global _current_on_state
     while True:
         colour = get_colour_for_now()
@@ -113,12 +113,13 @@ for device_file in evdev.list_devices():
             candidate_device.name.startswith('Puck.js'):
         device = candidate_device
         break
-if device is None:
-    raise 'No device found'
-print('Running with device: ', device.fn)
 get_on_state()
 print('Starting with on state: ', _current_on_state)
-asyncio.ensure_future(button_loop(device))
-asyncio.ensure_future(schedule_loop(device))
+if device is None:
+    print('No button found')
+else:
+    print('Running with device: ', device.fn)
+    asyncio.ensure_future(button_loop(device))
+asyncio.ensure_future(schedule_loop())
 loop = asyncio.get_event_loop()
 loop.run_forever()
